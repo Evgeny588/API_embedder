@@ -14,9 +14,7 @@ def init_model(model: str | None = None):
     model_name = model or os.getenv("MODEL")
 
     try:
-        embedding_model = TextEmbedding(
-            model_name=model_name, cache_path="cache_models"
-        )
+        embedding_model = TextEmbedding(model_name=model_name, cache_dir="cache_models")
 
         return embedding_model
     except Exception as e:
