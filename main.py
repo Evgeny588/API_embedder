@@ -17,7 +17,7 @@ load_dotenv()
 async def lifespan(app: FastAPI):
     logger.info(f"App started in {datetime.now()}.")
     app.state.model = init_model(model=os.getenv("MODEL"))
-    logger.info("Model ready.")
+    logger.info(f"Model {os.getenv("MODEL")} ready.")
 
     yield
 
@@ -44,7 +44,7 @@ async def get_embedding(inputs: InputModel, request: Request) -> dict:
             embeddings = list(model.embed([text]))
             filepath = write_embedding(embeddings[0])
 
-            return {"out_embed": f"{filepath}", "status": "ok"}
+            return {"out_embed": f"{filepath}", "status": "ok", "model": f"{os.getenv("MODEL")}"}
         except Exception as e:
             logger.exception(f"Exception: {str(e)}")
             raise HTTPException(status_code=500, detail="Internal server error")
@@ -52,3 +52,10 @@ async def get_embedding(inputs: InputModel, request: Request) -> dict:
         raise HTTPException(
             status_code=400, detail="Empty input, please enter text in inputs/input.txt"
         )
+    
+
+@app.get("/models")
+async def get_supported_models():
+    from fastembed import TextEmbedding
+    return TextEmbedding.list_supported_models()
+

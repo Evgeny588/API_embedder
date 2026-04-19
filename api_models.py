@@ -9,3 +9,4 @@ class InputModel(BaseModel):
 class OutputModel(BaseModel):
     out_embed: str
     status: str
+    model: str
