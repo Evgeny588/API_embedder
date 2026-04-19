@@ -1,9 +1,8 @@
 from pydantic import BaseModel
-from typing import Optional
 
 
 class InputModel(BaseModel):
-    text: Optional[str] = None
+    text_or_filename: str | None = None
 
 
 class OutputModel(BaseModel):

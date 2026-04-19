@@ -1,9 +1,15 @@
 import os
 import gc
 import sys
+import aiofiles
 from datetime import datetime
 
+from fastapi import HTTPException
 from fastembed import TextEmbedding
+
+from set_logging import setup_logging
+
+logger = setup_logging(__name__)
 
 
 def init_model(model: str | None = None):
@@ -52,3 +58,22 @@ def write_embedding(embedding) -> str:
         f.write(str(embedding.tolist()))
 
     return filepath
+
+
+async def file_read(name_of_file: str) -> str | None:
+    if not os.path.exists(f"inputs/{name_of_file}"):
+        raise HTTPException(status_code=400, detail=f"File '{name_of_file}' not found.")
+    try:
+        async with aiofiles.open(
+            f"inputs/{name_of_file}", "r", encoding="utf-8"
+        ) as file:
+            text = await file.read()
+
+            if not text or not text.strip():
+                raise HTTPException(
+                    status_code=400, detail=f"File '{name_of_file}' is empty."
+                )
+            return text
+    except Exception:
+        logger.debug("Error file read: {e}")
+        raise HTTPException(status_code=500, detail="Error file read.")
