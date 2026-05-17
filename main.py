@@ -1,13 +1,14 @@
 import os
 from datetime import datetime
 from dotenv import load_dotenv
+from typing import Optional
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, UploadFile, Form, File
 from contextlib import asynccontextmanager
 
-from modules import init_model, clear_memory, write_embedding, file_read
+from modules import init_model, clear_memory, write_embedding 
 from set_logging import setup_logging
-from api_models import InputModel, OutputModel
+from api_models import OutputModel
 
 logger = setup_logging(__name__)
 load_dotenv()
@@ -34,40 +35,68 @@ async def status() -> dict:
 
 
 @app.post("/embedder", response_model=OutputModel)
-async def get_embedding(inputs: InputModel, request: Request) -> dict:
-    """Get embedding from raw text or file"""
-    input_data = inputs.text_or_filename
+async def get_embedding(
+    request: Request,
+    text: Optional[str] = Form(None, description="Сырой текст для эмбеддинга"),
+    file: Optional[UploadFile] = File(None, description="Файл .txt или .json")
+):
+    """
+    Принимает либо сырой текст, либо загруженный файл.
+    Возвращает путь к сохраненному эмбеддингу.
+    """
     model = request.app.state.model
+    text_to_embed = ""
 
-    if input_data:
-        is_file = input_data.lower().endswith((".txt", ".json"))
+    if not text and not file:
+        raise HTTPException(
+            status_code=400,
+            detail="Пожалуйста, передайте текст в поле 'text' или загрузите файл в поле 'file'."
+        )
+    
+    if text and file:
+        raise HTTPException(
+            status_code=400,
+            detail="Выберите что-то одно: либо текстовое поле, либо загрузку файла."
+        )
 
-        if is_file:
-            logger.info(f"Detected file path: {input_data}. Reading file...")
-            text_to_embed = await file_read(input_data)
-        else:
-            text_to_embed = input_data
-
-        try:
-            embeddings = list(model.embed([text_to_embed]))
-
-            filepath = write_embedding(embeddings[0])
-
-            return {
-                "out_embed": str(filepath),
-                "status": "ok",
-                "model": str(os.getenv("MODEL")),
-            }
-        except Exception as e:
-            logger.exception(f"Embedding error: {str(e)}")
+    if file:
+        filename = file.filename.lower()
+        if not (filename.endswith('.txt') or filename.endswith('.json')):
             raise HTTPException(
-                status_code=500, detail="Internal server error during processing"
+                status_code=400, 
+                detail="Разрешены только файлы с расширением .txt или .json"
             )
+        
+        try:
+            logger.info(f"Получен файл: {file.filename}. Чтение содержимого...") 
+            content_bytes = await file.read()
+            text_to_embed = content_bytes.decode("utf-8")
+        except Exception as e:
+            logger.error(f"Ошибка чтения файла: {e}")
+            raise HTTPException(status_code=400, detail="Не удалось прочитать или декодировать файл.") 
 
-    raise HTTPException(
-        status_code=400,
-        detail="Input text is empty. Please provide raw text or a path to .txt/.json file",
-    )
+    elif text:
+        text_to_embed = text
+
+    if not text_to_embed.strip():
+        raise HTTPException(status_code=400, detail="Текст для эмбеддинга пуст.")
+ 
+    try:
+        embeddings = list(model.embed([text_to_embed]))
+        
+        filepath = write_embedding(embeddings[0])
+
+        return {
+            "out_embed": str(filepath),
+            "status": "ok",
+            "model": os.getenv("MODEL", "jinaai/jina-embeddings-v3"),
+        }
+    except Exception as e:
+        logger.exception(f"Ошибка при создании эмбеддинга: {str(e)}")
+        raise HTTPException(
+            status_code=500, 
+            detail="Внутренняя ошибка сервера при обработке модели."
+        )
 
 
 @app.get("/models")
