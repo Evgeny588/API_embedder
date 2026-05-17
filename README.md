@@ -1,32 +1,48 @@
-# Веб-сервис эмбеддингов.
+# API Embedder
 
-**Использование**
-1. Склонируйте репозиторий на компьютер: 
-```bash 
-git clone https://github.com/Evgeny588/API_embedder.git
+Сервис генерации эмбеддингов.
+
+## 1. Сборка и запуск в Docker
+
+Сборка Docker-образа:
+```bash
+docker build -t api_embedder .
 ```
 
-2. Создайте в корне проекта файл ".env" и в нем создайте переменную MODEL = ...
-3. Установите Poetry:
-``` bash
-curl -sSL https://install.python-poetry.org | python3 -
+Запуск контейнера с сохранением кэша моделей на хосте:
+```bash
+docker run -d -p 8000:8000 -v \$(pwd)/cache_models:/api_embedder/cache_models --name embedder api_embedder
 ```
-4. Установите флаг, чтобы файлы виртуального окружения были в репозитории:
-``` bash
-poetry config virtualenvs.in-project true
+
+## 2. Локальный запуск (в виртуальном окружении)
+
+Установка зависимостей:
+```bash
+pip install -r requirements.txt
 ```
-5. Установите зависимости:
-``` bash
-poetry install
+
+Запуск сервера разработки:
+```bash
+uvicorn main:app 
 ```
-6. Запустите сервер unicorn:
-``` bash
-uvicorn main:app
+
+## 3. Примеры запросов (API)
+
+Интерактивная документация: http://localhost:8000/docs
+
+Отправка текста:
+```bash
+curl -X POST "http://localhost:8000/embedder" -F "text=Пример текста"
 ```
-7. Откройте в браузере localhost (если uvicorn запускали без доп. аргументов)
-8. В адресную строку после адреса localhost-a пропишите /docs - откроется интерфейс Swagger UI
-9. Найдите метод *embedder/*
-10. Поместите в папку inputs/ ваш текст в формате txt
-11. В предложенный json в поле *text_or_filename* введите название файла, и нажмите *Execute*
-12. Результат будет сохранен в папку *outputs/* в формате файла .txt с временной меткой в названии
-13. Поддерживается возможность вставлять "сырой" текст прямо в json, в поле *text_or_filename*
+
+Отправка файла:
+```bash
+curl -X POST "http://localhost:8000/embedder" -F "file=@document.txt"
+```
+
+## 4. Структура директорий
+
+* `cache_models/` — Кэш весов нейросети (монтируется извне).
+* `outputs/` — Директория выходных ответов в .txt формате
+* `logs/` — Логи приложения.
+
